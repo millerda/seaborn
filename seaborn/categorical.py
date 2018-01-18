@@ -1500,6 +1500,11 @@ class _CategoricalStatPlotter(_CategoricalPlotter):
                         sd = np.std(stat_data)
                         confint.append((estimate - sd, estimate + sd))
 
+                    elif ci == "sem":
+                        estimate = estimator(stat_data)
+                        sem = np.std(stat_data) / np.sqrt(len(stat_data))
+                        confint.append((estimate - sem, estimate + sem))
+
                     else:
 
                         boots = bootstrap(stat_data, func=estimator,
@@ -1549,6 +1554,11 @@ class _CategoricalStatPlotter(_CategoricalPlotter):
                             estimate = estimator(stat_data)
                             sd = np.std(stat_data)
                             confint[i].append((estimate - sd, estimate + sd))
+
+                        elif ci == "sem":
+                            estimate = estimator(stat_data)
+                            sem = np.std(stat_data) / np.sqrt(len(stat_data))
+                            confint[i].append((estimate - sem, estimate + sem))
 
                         else:
 
