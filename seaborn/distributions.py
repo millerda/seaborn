@@ -5,7 +5,10 @@ from scipy import stats
 import pandas as pd
 import matplotlib as mpl
 import matplotlib.pyplot as plt
+import matplotlib.transforms as tx
+from matplotlib.collections import LineCollection
 import warnings
+from distutils.version import LooseVersion
 
 from six import string_types
 
@@ -16,7 +19,7 @@ except ImportError:
     _has_statsmodels = False
 
 from .utils import iqr, _kde_support
-from .palettes import color_palette, blend_palette
+from .palettes import color_palette, light_palette, dark_palette, blend_palette
 
 
 __all__ = ["distplot", "kdeplot", "rugplot"]
@@ -24,7 +27,7 @@ __all__ = ["distplot", "kdeplot", "rugplot"]
 
 def _freedman_diaconis_bins(a):
     """Calculate number of hist bins using Freedman-Diaconis rule."""
-    # From http://stats.stackexchange.com/questions/798/
+    # From https://stats.stackexchange.com/questions/798/
     a = np.asarray(a)
     if len(a) < 2:
         return 1
@@ -70,7 +73,7 @@ def distplot(a, bins=None, hist=True, kde=True, rug=False, fit=None,
     color : matplotlib color, optional
         Color to plot everything but the fitted curve in.
     vertical : bool, optional
-        If True, oberved values are on y-axis.
+        If True, observed values are on y-axis.
     norm_hist : bool, optional
         If True, the histogram height shows a density rather than a count.
         This is implied if a KDE or fitted density is plotted.
@@ -117,7 +120,7 @@ def distplot(a, bins=None, hist=True, kde=True, rug=False, fit=None,
         >>> x = pd.Series(x, name="x variable")
         >>> ax = sns.distplot(x)
 
-    Plot the distribution with a kenel density estimate and rug plot:
+    Plot the distribution with a kernel density estimate and rug plot:
 
     .. plot::
         :context: close-figs
@@ -211,7 +214,11 @@ def distplot(a, bins=None, hist=True, kde=True, rug=False, fit=None,
         if bins is None:
             bins = min(_freedman_diaconis_bins(a), 50)
         hist_kws.setdefault("alpha", 0.4)
-        hist_kws.setdefault("normed", norm_hist)
+        if LooseVersion(mpl.__version__) < LooseVersion("2.2"):
+            hist_kws.setdefault("normed", norm_hist)
+        else:
+            hist_kws.setdefault("density", norm_hist)
+
         orientation = "horizontal" if vertical else "vertical"
         hist_color = hist_kws.pop("color", color)
         ax.hist(a, bins, orientation=orientation,
@@ -327,11 +334,10 @@ def _univariate_kdeplot(data, shade, vertical, kernel, bw, gridsize, cut,
             ax.fill_between(x, 0, y, **shade_kws)
 
     # Set the density axis minimum to 0
-    xmargin, ymargin = ax.margins()
     if vertical:
-        ax.set_xlim(0, max(ax.get_xlim()[1], (1 + xmargin) * x.max()))
+        ax.set_xlim(0, auto=None)
     else:
-        ax.set_ylim(0, max(ax.get_ylim()[1], (1 + ymargin) * y.max()))
+        ax.set_ylim(0, auto=None)
 
     # Draw the legend here
     handles, labels = ax.get_legend_handles_labels()
@@ -390,7 +396,18 @@ def _bivariate_kdeplot(x, y, filled, fill_lowest,
 
     # Plot the contours
     n_levels = kwargs.pop("n_levels", 10)
-    cmap = kwargs.get("cmap", "BuGn" if filled else "BuGn_d")
+
+    scout, = ax.plot([], [])
+    default_color = scout.get_color()
+    scout.remove()
+
+    color = kwargs.pop("color", default_color)
+    cmap = kwargs.pop("cmap", None)
+    if cmap is None:
+        if filled:
+            cmap = light_palette(color, as_cmap=True)
+        else:
+            cmap = dark_palette(color, as_cmap=True)
     if isinstance(cmap, string_types):
         if cmap.endswith("_d"):
             pal = ["#333333"]
@@ -398,6 +415,8 @@ def _bivariate_kdeplot(x, y, filled, fill_lowest,
             cmap = blend_palette(pal, as_cmap=True)
         else:
             cmap = mpl.cm.get_cmap(cmap)
+
+    label = kwargs.pop("label", None)
 
     kwargs["cmap"] = cmap
     contour_func = ax.contourf if filled else ax.contour
@@ -415,6 +434,13 @@ def _bivariate_kdeplot(x, y, filled, fill_lowest,
         ax.set_xlabel(x.name)
     if hasattr(y, "name") and axlabel:
         ax.set_ylabel(y.name)
+
+    if label is not None:
+        legend_color = cmap(.95) if color is None else color
+        if filled:
+            ax.fill_between([], [], color=legend_color, label=label)
+        else:
+            ax.plot([], [], color=legend_color, label=label)
 
     return ax
 
@@ -445,7 +471,7 @@ def _statsmodels_bivariate_kde(x, y, bw, gridsize, cut, clip):
 def _scipy_bivariate_kde(x, y, bw, gridsize, cut, clip):
     """Compute a bivariate kde using scipy."""
     data = np.c_[x, y]
-    kde = stats.gaussian_kde(data.T)
+    kde = stats.gaussian_kde(data.T, bw_method=bw)
     data_std = data.std(axis=0, ddof=1)
     if isinstance(bw, string_types):
         bw = "scotts" if bw == "scott" else bw
@@ -486,7 +512,11 @@ def kdeplot(data, data2=None, shade=False, vertical=False, kernel="gau",
         gaussian kernel.
     bw : {'scott' | 'silverman' | scalar | pair of scalars }, optional
         Name of reference method to determine kernel size, scalar factor,
-        or scalar for each dimension of the bivariate plot.
+        or scalar for each dimension of the bivariate plot. Note that the
+        underlying computational libraries have different interperetations
+        for this parameter: ``statsmodels`` uses it directly, but ``scipy``
+        treats it as a scaling factor for the standard deviation of the
+        data.
     gridsize : int, optional
         Number of discrete points in the evaluation grid.
     cut : scalar, optional
@@ -677,7 +707,7 @@ def rugplot(a, height=.05, axis="x", ax=None, **kwargs):
     ax : matplotlib axes, optional
         Axes to draw plot into; otherwise grabs current axes.
     kwargs : key, value pairings
-        Other keyword arguments are passed to ``axvline`` or ``axhline``.
+        Other keyword arguments are passed to ``LineCollection``.
 
     Returns
     -------
@@ -689,9 +719,24 @@ def rugplot(a, height=.05, axis="x", ax=None, **kwargs):
         ax = plt.gca()
     a = np.asarray(a)
     vertical = kwargs.pop("vertical", axis == "y")
-    func = ax.axhline if vertical else ax.axvline
+
+    alias_map = dict(linewidth="lw", linestyle="ls", color="c")
+    for attr, alias in alias_map.items():
+        if alias in kwargs:
+            kwargs[attr] = kwargs.pop(alias)
     kwargs.setdefault("linewidth", 1)
-    for pt in a:
-        func(pt, 0, height, **kwargs)
+
+    if vertical:
+        trans = tx.blended_transform_factory(ax.transAxes, ax.transData)
+        xy_pairs = np.column_stack([np.tile([0, height], len(a)),
+                                    np.repeat(a, 2)])
+    else:
+        trans = tx.blended_transform_factory(ax.transData, ax.transAxes)
+        xy_pairs = np.column_stack([np.repeat(a, 2),
+                                    np.tile([0, height], len(a))])
+    line_segs = xy_pairs.reshape([len(a), 2, 2])
+    ax.add_collection(LineCollection(line_segs, transform=trans, **kwargs))
+
+    ax.autoscale_view(scalex=not vertical, scaley=vertical)
 
     return ax

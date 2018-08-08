@@ -238,8 +238,8 @@ class _HeatMapper(object):
                                        mesh.get_array(), mesh.get_facecolors(),
                                        self.annot_data.flat):
             if m is not np.ma.masked:
-                l = relative_luminance(color)
-                text_color = ".15" if l > .408 else "w"
+                lum = relative_luminance(color)
+                text_color = ".15" if lum > .408 else "w"
                 annotation = ("{:" + self.fmt + "}").format(val)
                 text_kwargs = dict(color=text_color, ha="center", va="center")
                 text_kwargs.update(self.annot_kws)
@@ -286,6 +286,9 @@ class _HeatMapper(object):
         # Set the axis limits
         ax.set(xlim=(0, self.data.shape[1]), ylim=(0, self.data.shape[0]))
 
+        # Invert the y axis to show the plot in matrix form
+        ax.invert_yaxis()
+
         # Possibly add a colorbar
         if self.cbar:
             cb = ax.figure.colorbar(mesh, cax, ax, **self.cbar_kws)
@@ -311,7 +314,8 @@ class _HeatMapper(object):
         ytl = ax.set_yticklabels(yticklabels, rotation="vertical")
 
         # Possibly rotate them if they overlap
-        ax.figure.draw(ax.figure.canvas.get_renderer())
+        if hasattr(ax.figure.canvas, "get_renderer"):
+            ax.figure.draw(ax.figure.canvas.get_renderer())
         if axis_ticklabels_overlap(xtl):
             plt.setp(xtl, rotation="vertical")
         if axis_ticklabels_overlap(ytl):
@@ -323,9 +327,6 @@ class _HeatMapper(object):
         # Annotate the cells with the formatted values
         if self.annot:
             self._annotate_heatmap(ax, mesh)
-
-        # Invert the y axis to show the plot in matrix form
-        ax.invert_yaxis()
 
 
 def heatmap(data, vmin=None, vmax=None, cmap=None, center=None, robust=False,
@@ -696,7 +697,8 @@ class _DendrogramPlotter(object):
         ytl = ax.set_yticklabels(self.yticklabels, rotation='vertical')
 
         # Force a draw of the plot to avoid matplotlib window error
-        ax.figure.draw(ax.figure.canvas.get_renderer())
+        if hasattr(ax.figure.canvas, "get_renderer"):
+            ax.figure.draw(ax.figure.canvas.get_renderer())
         if len(ytl) > 0 and axis_ticklabels_overlap(ytl):
             plt.setp(ytl, rotation="horizontal")
         if len(xtl) > 0 and axis_ticklabels_overlap(xtl):
@@ -818,9 +820,9 @@ class ClusterGrid(Grid):
             if isinstance(colors, (pd.DataFrame, pd.Series)):
                 # Ensure colors match data indices
                 if axis == 0:
-                    colors = colors.ix[data.index]
+                    colors = colors.loc[data.index]
                 else:
-                    colors = colors.ix[data.columns]
+                    colors = colors.loc[data.columns]
 
                 # Replace na's with background color
                 # TODO We should set these to transparent instead
@@ -912,10 +914,6 @@ class ClusterGrid(Grid):
             Noramlized data with a mean of 0 and variance of 1 across the
             specified axis.
 
-        >>> import numpy as np
-        >>> d = np.arange(5, 8, 0.5)
-        >>> ClusterGrid.standard_scale(d)
-        array([ 0. ,  0.2,  0.4,  0.6,  0.8,  1. ])
         """
         # Normalize these values to range from 0 to 1
         if axis == 1:
@@ -1159,11 +1157,14 @@ def clustermap(data, pivot_kws=None, method='average', metric='euclidean',
     method : str, optional
         Linkage method to use for calculating clusters.
         See scipy.cluster.hierarchy.linkage documentation for more information:
-        http://docs.scipy.org/doc/scipy/reference/generated/scipy.cluster.hierarchy.linkage.html
+        https://docs.scipy.org/doc/scipy/reference/generated/scipy.cluster.hierarchy.linkage.html
     metric : str, optional
         Distance metric to use for the data. See
         scipy.spatial.distance.pdist documentation for more options
-        http://docs.scipy.org/doc/scipy/reference/generated/scipy.spatial.distance.pdist.html
+        https://docs.scipy.org/doc/scipy/reference/generated/scipy.spatial.distance.pdist.html
+        To use different metrics (or methods) for rows and columns, you may
+        construct each linkage matrix yourself and provide them as
+        {row,col}_linkage.
     z_score : int or None, optional
         Either 0 (rows) or 1 (columns). Whether or not to calculate z-scores
         for the rows or the columns. Z scores are: z = (x - mean)/std, so

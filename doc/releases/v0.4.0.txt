@@ -15,7 +15,7 @@ Plotting functions
 
 - When using :class:`FacetGrid` with a ``hue`` variable, the legend is no longer drawn by default when you call :meth:`FacetGrid.map`. Instead, you have to call :meth:`FacetGrid.add_legend` manually. This should make it easier to layer multiple plots onto the grid without having duplicated legends.
 
-- Made some changes to :func:`factorplot` so that it behaves better when not all levels of the ``x`` variable are represented in each facet.
+- Made some changes to ``factorplot`` so that it behaves better when not all levels of the ``x`` variable are represented in each facet.
 
 - Added the ``logx`` option to :func:`regplot` for fitting the regression in log space.
 
@@ -26,7 +26,7 @@ Style and color palettes
 
 - Added the :func:`cubehelix_palette` function for generating sequential palettes from the cubehelix system. See the :ref:`palette docs <cubehelix_palettes>` for more information on how these palettes can be used. There is also the :func:`choose_cubehelix` which will launch an interactive app to select cubehelix parameters in the notebook.
 
-- Added the :func:`xkcd_palette` and the ``xkcd_rgb`` dictionary so that colors :ref:`can be specified <using_xkcd_palettes>` with names from the `xkcd color survey <http://blog.xkcd.com/2010/05/03/color-survey-results/>`_.
+- Added the :func:`xkcd_palette` and the ``xkcd_rgb`` dictionary so that colors :ref:`can be specified <using_xkcd_palettes>` with names from the `xkcd color survey <https://blog.xkcd.com/2010/05/03/color-survey-results/>`_.
 
 - Added the ``font_scale`` option to :func:`plotting_context`, :func:`set_context`, and :func:`set`. ``font_scale`` can independently increase or decrease the size of the font elements in the plot.
 
