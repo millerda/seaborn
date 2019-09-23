@@ -524,6 +524,8 @@ class _RelationalPlotter(object):
         """Determine if data should considered numeric or categorical."""
         if self.input_format == "wide":
             return "categorical"
+        elif isinstance(data, pd.Series) and data.dtype.name == "category":
+            return "categorical"
         else:
             try:
                 float_data = data.astype(np.float)
@@ -1136,7 +1138,7 @@ lineplot.__doc__ = dedent("""\
     err_style : "band" or "bars", optional
         Whether to draw the confidence intervals with translucent error bands
         or discrete error bars.
-    err_band : dict of keyword arguments
+    err_kws : dict of keyword arguments
         Additional paramters to control the aesthetics of the error bars. The
         kwargs are passed either to ``ax.fill_between`` or ``ax.errorbar``,
         depending on the ``err_style``.
